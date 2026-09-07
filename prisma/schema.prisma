@@ -1,0 +1,490 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+enum EmploymentType {
+  PROBATION
+  OFFICIAL
+  PART_TIME
+  FREELANCER
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectMemberStatus {
+  ACTIVE
+  INACTIVE
+  LEFT
+}
+
+enum MilestoneStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum DailyReportStatus {
+  DRAFT
+  SUBMITTED
+  LATE
+}
+
+enum BlockerSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum BlockerStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum NotificationType {
+  PROJECT_ASSIGNMENT
+  TASK_ASSIGNED
+  TASK_DEADLINE
+  TASK_OVERDUE
+  COMMENT_MENTION
+  BLOCKER_RESOLVED
+  DAILY_REPORT_REMINDER
+  SYSTEM_ALERT
+}
+
+model User {
+  id                  BigInt        @id @default(autoincrement())
+  username            String        @unique @db.VarChar(100)
+  email               String        @unique @db.VarChar(255)
+  passwordHash        String        @map("password_hash") @db.VarChar(255)
+  status              AccountStatus @default(ACTIVE)
+  failedLoginAttempts Int           @default(0) @map("failed_login_attempts")
+  lastLoginAt         DateTime?     @map("last_login_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  isDeleted           Boolean       @default(false) @map("is_deleted")
+  deletedAt           DateTime?     @map("deleted_at")
+  employee            Employee?
+  roles               UserRole[]
+  auditLogs           AuditLog[]
+
+  @@map("users")
+}
+
+model Role {
+  id          BigInt           @id @default(autoincrement())
+  code        String           @unique @db.VarChar(50)
+  name        String           @db.VarChar(100)
+  description String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          BigInt           @id @default(autoincrement())
+  code        String           @unique @db.VarChar(100)
+  name        String           @db.VarChar(150)
+  module      String           @db.VarChar(50)
+  description String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       BigInt     @map("role_id")
+  permissionId BigInt     @map("permission_id")
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId BigInt @map("user_id")
+  roleId BigInt @map("role_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Department {
+  id          BigInt     @id @default(autoincrement())
+  code        String     @unique @db.VarChar(50)
+  name        String     @db.VarChar(150)
+  description String?
+  managerId   BigInt?    @map("manager_id")
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  isDeleted   Boolean    @default(false) @map("is_deleted")
+  manager     Employee?  @relation("DepartmentManager", fields: [managerId], references: [id])
+  employees   Employee[]
+
+  @@map("departments")
+}
+
+model Position {
+  id          BigInt     @id @default(autoincrement())
+  code        String     @unique @db.VarChar(50)
+  name        String     @db.VarChar(150)
+  description String?
+  level       Int        @default(1)
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  isDeleted   Boolean    @default(false) @map("is_deleted")
+  employees   Employee[]
+
+  @@map("positions")
+}
+
+model Employee {
+  id                 BigInt          @id @default(autoincrement())
+  userId             BigInt?         @unique @map("user_id")
+  employeeCode       String          @unique @map("employee_code") @db.VarChar(50)
+  fullName           String          @map("full_name") @db.VarChar(150)
+  avatarUrl          String?         @map("avatar_url")
+  email              String          @unique @db.VarChar(255)
+  phone              String?         @db.VarChar(20)
+  dateOfBirth        DateTime?       @map("date_of_birth") @db.Date
+  gender             String?         @db.VarChar(10)
+  address            String?
+  joinDate           DateTime        @map("join_date") @db.Date
+  departmentId       BigInt?         @map("department_id")
+  positionId         BigInt?         @map("position_id")
+  directManagerId    BigInt?         @map("direct_manager_id")
+  employmentType     EmploymentType  @default(OFFICIAL) @map("employment_type")
+  status             EmployeeStatus  @default(ACTIVE)
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  isDeleted          Boolean         @default(false) @map("is_deleted")
+  deletedAt          DateTime?       @map("deleted_at")
+  
+  user               User?           @relation(fields: [userId], references: [id])
+  department         Department?     @relation(fields: [departmentId], references: [id])
+  position           Position?       @relation(fields: [positionId], references: [id])
+  directManager      Employee?       @relation("EmployeeManager", fields: [directManagerId], references: [id])
+  subordinates       Employee[]      @relation("EmployeeManager")
+  managedDepartments Department[]    @relation("DepartmentManager")
+  managedProjects    Project[]       @relation("ProjectManager")
+  projectMembers     ProjectMember[]
+  assignedTasks      Task[]          @relation("TaskAssignee")
+  reportedTasks      Task[]          @relation("TaskReporter")
+  taskComments       TaskComment[]
+  taskActivities     TaskActivity[]  @relation("TaskActor")
+  dailyReports       DailyReport[]
+  reportedBlockers   Blocker[]       @relation("BlockerReporter")
+  resolvedBlockers   Blocker[]       @relation("BlockerResolver")
+  notifications      Notification[]
+
+  @@index([departmentId])
+  @@index([positionId])
+  @@index([directManagerId])
+  @@index([status])
+  @@map("employees")
+}
+
+model Project {
+  id              BigInt             @id @default(autoincrement())
+  code            String             @unique @db.VarChar(50)
+  name            String             @db.VarChar(200)
+  description     String?
+  customerName    String?            @map("customer_name") @db.VarChar(150)
+  pmId            BigInt             @map("pm_id")
+  startDate       DateTime           @map("start_date") @db.Date
+  expectedEndDate DateTime           @map("expected_end_date") @db.Date
+  actualEndDate   DateTime?          @map("actual_end_date") @db.Date
+  priority        ProjectPriority    @default(MEDIUM)
+  status          ProjectStatus      @default(PLANNING)
+  overallProgress Int                @default(0) @map("overall_progress")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  isDeleted       Boolean            @default(false) @map("is_deleted")
+  deletedAt       DateTime?          @map("deleted_at")
+  projectManager  Employee           @relation("ProjectManager", fields: [pmId], references: [id])
+  members         ProjectMember[]
+  milestones      ProjectMilestone[]
+  tasks           Task[]
+  dailyItems      DailyReportItem[]
+  blockers        Blocker[]
+
+  @@index([pmId])
+  @@index([status])
+  @@index([priority])
+  @@index([expectedEndDate])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id                   BigInt              @id @default(autoincrement())
+  projectId            BigInt              @map("project_id")
+  employeeId           BigInt              @map("employee_id")
+  projectRole          String              @map("project_role") @db.VarChar(100)
+  allocationPercentage Int                 @default(100) @map("allocation_percentage")
+  joinedAt             DateTime            @map("joined_at") @db.Date
+  leftAt               DateTime?           @map("left_at") @db.Date
+  status               ProjectMemberStatus @default(ACTIVE)
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  project              Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee             Employee            @relation(fields: [employeeId], references: [id])
+
+  @@unique([projectId, employeeId])
+  @@index([employeeId])
+  @@index([status])
+  @@map("project_members")
+}
+
+model ProjectMilestone {
+  id          BigInt          @id @default(autoincrement())
+  projectId   BigInt          @map("project_id")
+  name        String          @db.VarChar(150)
+  description String?
+  startDate   DateTime        @map("start_date") @db.Date
+  dueDate     DateTime        @map("due_date") @db.Date
+  status      MilestoneStatus @default(PLANNED)
+  progress    Int             @default(0)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  isDeleted   Boolean         @default(false) @map("is_deleted")
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@index([projectId])
+  @@index([dueDate])
+  @@map("project_milestones")
+}
+
+model Task {
+  id            BigInt            @id @default(autoincrement())
+  taskCode      String            @unique @map("task_code") @db.VarChar(50)
+  title         String            @db.VarChar(255)
+  description   String?
+  projectId     BigInt            @map("project_id")
+  milestoneId   BigInt?           @map("milestone_id")
+  assigneeId    BigInt?           @map("assignee_id")
+  reporterId    BigInt            @map("reporter_id")
+  priority      TaskPriority      @default(MEDIUM)
+  status        TaskStatus        @default(TODO)
+  startDate     DateTime?         @map("start_date") @db.Date
+  dueDate       DateTime?         @map("due_date") @db.Date
+  estimateHours Decimal?          @default(0) @map("estimate_hours") @db.Decimal(6, 2)
+  actualHours   Decimal?          @default(0) @map("actual_hours") @db.Decimal(6, 2)
+  progress      Int               @default(0)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  isDeleted     Boolean           @default(false) @map("is_deleted")
+  deletedAt     DateTime?         @map("deleted_at")
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone     ProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  assignee      Employee?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  reporter      Employee          @relation("TaskReporter", fields: [reporterId], references: [id])
+  comments      TaskComment[]
+  activities    TaskActivity[]
+  dailyItems    DailyReportItem[]
+  blockers      Blocker[]
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([milestoneId])
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+  @@map("tasks")
+}
+
+model TaskComment {
+  id        BigInt   @id @default(autoincrement())
+  taskId    BigInt   @map("task_id")
+  authorId  BigInt   @map("author_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    Employee @relation(fields: [authorId], references: [id])
+
+  @@index([taskId])
+  @@map("task_comments")
+}
+
+model TaskActivity {
+  id           BigInt   @id @default(autoincrement())
+  taskId       BigInt   @map("task_id")
+  actorId      BigInt   @map("actor_id")
+  actionType   String   @map("action_type") @db.VarChar(50)
+  fieldChanged String?  @map("field_changed") @db.VarChar(50)
+  oldValue     String?  @map("old_value")
+  newValue     String?  @map("new_value")
+  createdAt    DateTime @default(now()) @map("created_at")
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actor        Employee @relation("TaskActor", fields: [actorId], references: [id])
+
+  @@index([taskId])
+  @@map("task_activities")
+}
+
+model DailyReport {
+  id           BigInt            @id @default(autoincrement())
+  employeeId   BigInt            @map("employee_id")
+  reportDate   DateTime          @map("report_date") @db.Date
+  submittedAt  DateTime?         @map("submitted_at")
+  overallNote  String?           @map("overall_note")
+  tomorrowPlan String?           @map("tomorrow_plan")
+  status       DailyReportStatus @default(DRAFT)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  employee     Employee          @relation(fields: [employeeId], references: [id])
+  items        DailyReportItem[]
+
+  @@unique([employeeId, reportDate])
+  @@index([reportDate])
+  @@index([status])
+  @@map("daily_reports")
+}
+
+model DailyReportItem {
+  id                 BigInt      @id @default(autoincrement())
+  dailyReportId      BigInt      @map("daily_report_id")
+  projectId          BigInt      @map("project_id")
+  taskId             BigInt?     @map("task_id")
+  workDone           String      @map("work_done")
+  workResult         String?     @map("work_result")
+  progressBefore     Int         @default(0) @map("progress_before")
+  progressAfter      Int         @default(0) @map("progress_after")
+  workingHours       Decimal     @default(0) @map("working_hours") @db.Decimal(4, 2)
+  hasBlocker         Boolean     @default(false) @map("has_blocker")
+  blockerDescription String?     @map("blocker_description")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  dailyReport        DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  project            Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task               Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  blockers           Blocker[]
+
+  @@index([dailyReportId])
+  @@index([projectId])
+  @@index([taskId])
+  @@map("daily_report_items")
+}
+
+model Blocker {
+  id                BigInt           @id @default(autoincrement())
+  projectId         BigInt           @map("project_id")
+  taskId            BigInt?          @map("task_id")
+  dailyReportItemId BigInt?          @map("daily_report_item_id")
+  reporterId        BigInt           @map("reporter_id")
+  resolverId        BigInt?          @map("resolver_id")
+  description       String
+  severity          BlockerSeverity  @default(MEDIUM)
+  status            BlockerStatus    @default(OPEN)
+  resolution        String?
+  resolvedAt        DateTime?        @map("resolved_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task              Task?            @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  dailyReportItem   DailyReportItem? @relation(fields: [dailyReportItemId], references: [id], onDelete: SetNull)
+  reporter          Employee         @relation("BlockerReporter", fields: [reporterId], references: [id])
+  resolver          Employee?        @relation("BlockerResolver", fields: [resolverId], references: [id])
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([status])
+  @@index([severity])
+  @@map("blockers")
+}
+
+model Notification {
+  id                BigInt           @id @default(autoincrement())
+  recipientId       BigInt           @map("recipient_id")
+  type              NotificationType
+  title             String           @db.VarChar(200)
+  content           String
+  relatedEntityType String?          @map("related_entity_type") @db.VarChar(50)
+  relatedEntityId   BigInt?          @map("related_entity_id")
+  isRead            Boolean          @default(false) @map("is_read")
+  readAt            DateTime?        @map("read_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  recipient         Employee         @relation(fields: [recipientId], references: [id])
+
+  @@index([recipientId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id            BigInt   @id @default(autoincrement())
+  userId        BigInt?  @map("user_id")
+  action        String   @db.VarChar(100)
+  entityType    String   @map("entity_type") @db.VarChar(50)
+  entityId      BigInt   @map("entity_id")
+  payloadBefore Json?    @map("payload_before")
+  payloadAfter  Json?    @map("payload_after")
+  ipAddress     String?  @map("ip_address") @db.VarChar(45)
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
